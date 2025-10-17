@@ -11,14 +11,14 @@
 				   @bind-OfficeColor="@OfficeColor"
 				   StorageName="theme" />
 
-<h3>Settings</h3>
+<h3>Einstellungen</h3>
 
 <div>
 	<FluentStack Orientation="Microsoft.FluentUI.AspNetCore.Components.Orientation.Vertical">
 		<FluentSelect   Label="Theme" Width="150px"
 						Items="@(Enum.GetValues<DesignThemeModes>())"
 						@bind-SelectedOption="@Mode" />
-		<FluentSelect   Label="Color"
+		<FluentSelect   Label="Farbe"
 						Items="@(Enum.GetValues<OfficeColor>().Select(i => (OfficeColor?)i))"
 			Height="200px" Width="250px" @bind-SelectedOption="@OfficeColor">
 			<OptionTemplate>
