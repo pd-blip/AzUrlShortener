@@ -24,7 +24,7 @@ defaul﻿@page "/settings"
 			<OptionTemplate>
 				<FluentStack>
 					<FluentIcon Value="@(new Icons.Filled.Size20.RectangleLandscape())" Color="Color.Custom"
-						CustomColor="@(@context.ToAttributeValue() != "Standard" ? context.ToAttributeValue() : "#036ac4" )" />
+						CustomColor="@(@context.ToAttributeValue() != "default" ? context.ToAttributeValue() : "#036ac4" )" />
 					<FluentLabel>@context</FluentLabel>
 				</FluentStack>
 			</OptionTemplate>
