@@ -39,9 +39,9 @@ jobs:
 
 # --- Zusätzliche Umgebungsvariablen hinzufügen ---
 env:
-  AZURE_CONTAINER_REGISTRY: 'acrczix7sxy4mcle' # Ihre ACR
+  AZURE_CONTAINER_REGISTRY: 'acr3c4cn3rgwaqwk' Ihre ACR
   CONTAINER_APP_NAME: 'admin'                 # Ihre Container App
-  RESOURCE_GROUP: 'rg-urlshort'               # Ihre Ressourcengruppe
+  RESOURCE_GROUP: 'rg-AzUrlShortener'               # Ihre Ressourcengruppe
   IMAGE_NAME: 'azurlshortener-image'          # Name des Images
 
 # --- Neuer Deployment-Job ---
