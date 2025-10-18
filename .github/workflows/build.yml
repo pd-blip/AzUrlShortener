@@ -57,7 +57,12 @@ jobs:
       uses: azure/login@v1
       with:
         # HINWEIS: Ersetzen Sie dies durch Ihre tatsächlichen Secrets
-        creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }}
+          creds: ${{ secrets.AZURE_CREDENTIALS }} # Oder separate Secrets
+          # client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          # tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          # subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+        
 
     # 2. Docker Login bei der Azure Container Registry
     #    Hinweis: az acr login wird oft empfohlen, wenn azure/login verwendet wird.
