@@ -71,7 +71,7 @@ jobs:
     - name: Deploy services using AZD
       run: azd deploy
       env:
-        AZURE_ENV_NAME: azurlshortener-prod # <-- ERSETZEN SIE DIES durch Ihren AZD-Environment-Namen!
+        AZURE_ENV_NAME: AzUrlShortener # <-- ERSETZEN SIE DIES durch Ihren AZD-Environment-Namen!
         AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
         # AZD verwendet die 'creds' vom azure/login Schritt normalerweise automatisch.
