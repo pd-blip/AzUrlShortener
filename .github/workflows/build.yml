@@ -82,7 +82,7 @@ jobs:
       uses: docker/build-push-action@v5
       with:
         context: ./src/TinyBlazorAdmin # Der Ordner, der die Dockerfile enthält
-        file: ./src/TinyBlazorAdmin/Dockerfile # Der Pfad zur Dockerfile
+        #file: ./src/TinyBlazorAdmin/Dockerfile # Der Pfad zur Dockerfile
         push: true
         tags: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
