@@ -1,4 +1,4 @@
-name: Build
+name: Build and Deploy AzUrlShortener
 
 on:
   push:
@@ -10,10 +10,17 @@ on:
       - main
       - v-next
 
+# --- Umgebungsvariablen HIER definieren (global für alle Jobs) ---
+env:
+  AZURE_CONTAINER_REGISTRY: 'acr3c4cn3rgwaqwk' # Ihre ACR
+  CONTAINER_APP_NAME: 'admin'                 # Name der zu aktualisierenden Container App (hier: admin)
+  RESOURCE_GROUP: 'rg-AzUrlShortener'         # Ihre Ressourcengruppe
+  IMAGE_NAME: 'tinyblazoradmin'               # Name des Images in ACR (muss dem Namen entsprechen, den Sie beim docker build verwenden!)
+
 jobs:
+  # --- Ihr vorhandener Build-Job ---
   build:
     runs-on: ubuntu-latest
-
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
@@ -21,7 +28,7 @@ jobs:
     - name: Set up .NET
       uses: actions/setup-dotnet@v4
       with:
-        dotnet-version: '9.0.x' # Adjust the version as needed
+        dotnet-version: '9.0.x' # Passen Sie die Version bei Bedarf an
 
     - name: Clean up previous builds
       run: dotnet clean src/AzUrlShortener.sln
@@ -34,62 +41,55 @@ jobs:
 
     - name: Build solution
       run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
-# Ihre vorhandenen Jobs (der "build"-Job) bleibt wie er ist.
-# Wir fügen den Deployment-Job hinzu:
 
-# --- Zusätzliche Umgebungsvariablen hinzufügen ---
-env:
-  AZURE_CONTAINER_REGISTRY: 'acr3c4cn3rgwaqwk' Ihre ACR
-  CONTAINER_APP_NAME: 'admin'                 # Ihre Container App
-  RESOURCE_GROUP: 'rg-AzUrlShortener'               # Ihre Ressourcengruppe
-  IMAGE_NAME: 'azurlshortener-image'          # Name des Images
-
-# --- Neuer Deployment-Job ---
-jobs:
-  build:
-    # ... Ihr vorhandener Build-Code ...
-
+  # --- Der neue Deployment-Job (korrekt eingerückt) ---
   deploy:
     runs-on: ubuntu-latest
     needs: build # Stellt sicher, dass dieser Job nur nach einem erfolgreichen Build ausgeführt wird
     environment: Production
-    
+
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 1. Azure Login (mit Service Principal oder OIDC-Secrets)
+    # 1. Azure Login
     - name: 'Login via Azure CLI'
       uses: azure/login@v1
       with:
         # HINWEIS: Ersetzen Sie dies durch Ihre tatsächlichen Secrets
-        creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }} 
+        creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }}
 
     # 2. Docker Login bei der Azure Container Registry
-    - name: 'Docker Login to ACR'
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
-        username: ${{ secrets.REGISTRY_USERNAME }}
-        password: ${{ secrets.REGISTRY_PASSWORD }}
+    #    Hinweis: az acr login wird oft empfohlen, wenn azure/login verwendet wird.
+    #    Alternative:
+    #    - name: 'Docker Login to ACR'
+    #      uses: docker/login-action@v3
+    #      with:
+    #        registry: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
+    #        username: ${{ secrets.REGISTRY_USERNAME }} # Oder Client ID des SP
+    #        password: ${{ secrets.REGISTRY_PASSWORD }} # Oder Client Secret des SP
+    - name: Log in to Azure Container Registry
+      run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
 
-    # 3. Docker Image bauen und taggen (NUTZT DIE DOCKERFILE IM ROOT!)
-    - name: Build and Push Docker Image
+    # 3. Docker Image bauen und pushen (nur für admin)
+    #    WICHTIG: Passen Sie den Pfad zur Dockerfile und den Kontext an!
+    - name: Build and Push Docker Image for Admin App
       uses: docker/build-push-action@v5
       with:
-        context: .
+        context: ./src/TinyBlazorAdmin # Der Ordner, der die Dockerfile enthält
+        file: ./src/TinyBlazorAdmin/Dockerfile # Der Pfad zur Dockerfile
         push: true
         tags: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
 
-    # 4. Deployment zur Azure Container App
+    # 4. Deployment zur Azure Container App ('admin')
     - name: 'Deploy to Azure Container Apps'
       uses: azure/container-apps-deploy-action@v1
       with:
-        appSourcePath: '${{ github.workspace }}'
+        # appSourcePath: '${{ github.workspace }}' # Wird oft nicht benötigt, wenn nur das Image aktualisiert wird
         containerAppName: ${{ env.CONTAINER_APP_NAME }}
         resourceGroup: ${{ env.RESOURCE_GROUP }}
         imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-        
+
+    # 5. Azure Logout (Optional, aber gute Praxis)
     - name: Azure Logout
       run: az logout
-
