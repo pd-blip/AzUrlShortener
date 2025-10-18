@@ -43,6 +43,7 @@ jobs:
       run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
 
   # --- Der neue Deployment-Job (korrekt eingerückt) ---
+ # --- Der KORREKTE Deployment-Job (ohne Docker, mit AZD) ---
   deploy:
     runs-on: ubuntu-latest
     needs: build # Stellt sicher, dass dieser Job nur nach einem erfolgreichen Build ausgeführt wird
@@ -52,49 +53,29 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 1. Azure Login
+    # 1. Azure Login (wie bisher)
     - name: 'Login via Azure CLI'
       uses: azure/login@v1
       with:
-        # HINWEIS: Ersetzen Sie dies durch Ihre tatsächlichen Secrets
-          creds: ${{ secrets.AZURE_CREDENTIALS }} # Oder separate Secrets
-          # client-id: ${{ secrets.AZURE_CLIENT_ID }}
-          # tenant-id: ${{ secrets.AZURE_TENANT_ID }}
-          # subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        creds: ${{ secrets.AZURE_RBAC_CREDENTIALS }}
 
-        
+    # 2. Azure Developer CLI (azd) installieren
+    - name: Install Azure Developer CLI
+      run: |
+        curl -fsSL https://aka.ms/install-azd.sh | bash
 
-    # 2. Docker Login bei der Azure Container Registry
-    #    Hinweis: az acr login wird oft empfohlen, wenn azure/login verwendet wird.
-    #    Alternative:
-    #    - name: 'Docker Login to ACR'
-    #      uses: docker/login-action@v3
-    #      with:
-    #        registry: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io
-    #        username: ${{ secrets.REGISTRY_USERNAME }} # Oder Client ID des SP
-    #        password: ${{ secrets.REGISTRY_PASSWORD }} # Oder Client Secret des SP
-    - name: Log in to Azure Container Registry
-      run: az acr login --name ${{ env.AZURE_CONTAINER_REGISTRY }}
+    # 3. Bereitstellung mit AZD durchführen
+    #    WICHTIG: Stellen Sie sicher, dass Ihr AZD-Environment-Name korrekt ist!
+    #    (Der Name, den Sie bei 'azd init' gewählt haben, z.B. 'azurlshortener-prod')
+    #    azd verwendet die Konfiguration aus dem .azure-Ordner.
+    - name: Deploy services using AZD
+      run: azd deploy
+      env:
+        AZURE_ENV_NAME: azurlshortener-prod # <-- ERSETZEN SIE DIES durch Ihren AZD-Environment-Namen!
+        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+        # AZD verwendet die 'creds' vom azure/login Schritt normalerweise automatisch.
 
-    # 3. Docker Image bauen und pushen (nur für admin)
-    #    WICHTIG: Passen Sie den Pfad zur Dockerfile und den Kontext an!
-    - name: Build and Push Docker Image for Admin App
-      uses: docker/build-push-action@v5
-      with:
-        context: ./src/TinyBlazorAdmin # Der Ordner, der die Dockerfile enthält
-        #file: ./src/TinyBlazorAdmin/Dockerfile # Der Pfad zur Dockerfile
-        push: true
-        tags: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-    # 4. Deployment zur Azure Container App ('admin')
-    - name: 'Deploy to Azure Container Apps'
-      uses: azure/container-apps-deploy-action@v1
-      with:
-        # appSourcePath: '${{ github.workspace }}' # Wird oft nicht benötigt, wenn nur das Image aktualisiert wird
-        containerAppName: ${{ env.CONTAINER_APP_NAME }}
-        resourceGroup: ${{ env.RESOURCE_GROUP }}
-        imageToDeploy: ${{ env.AZURE_CONTAINER_REGISTRY }}.azurecr.io/${{ env.IMAGE_NAME }}:${{ github.sha }}
-
-    # 5. Azure Logout (Optional, aber gute Praxis)
+    # 4. Azure Logout (Optional)
     - name: Azure Logout
       run: az logout
