@@ -1,27 +1,27 @@
 # STAGE 1: Build-Umgebung (mit SDK zum Kompilieren)
-# Basis-Image für .NET 8.0 SDK
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Kopiere die Projektdatei und stelle Abhängigkeiten wieder her
-COPY ["src/AzUrlShortener.csproj", "src/"]
-RUN dotnet restore "src/AzUrlShortener.csproj"
-
-# Kopiere den gesamten Code und veröffentliche
+# Wir stellen auf Basis der Solution-Datei (.sln) wieder her,
+# da sie im Root-Ordner liegt und alle Abhängigkeiten erfasst.
+COPY ["AzUrlShortener.sln", ""] 
 COPY . .
-RUN dotnet publish "src/AzUrlShortener.csproj" -c Release -o /app/publish --no-restore
 
-# STAGE 2: Finale Laufzeit-Umgebung (kleineres Image ohne SDK)
-# Basis-Image für .NET 8.0 Runtime
+# Führe den Restore-Befehl aus
+RUN dotnet restore "AzUrlShortener.sln"
+
+# Veröffentliche das API-Projekt, das als Hauptanwendung dient.
+# Korrekter Pfad basierend auf Ihrem Screenshot: src/Api/Cloud5mins.ShortenerTools.Api.csproj
+RUN dotnet publish "src/Api/Cloud5mins.ShortenerTools.Api.csproj" -c Release -o /app/publish --no-restore
+
+# STAGE 2: Finale Laufzeit-Umgebung
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
-
-# Legt den internen Port fest, den Container Apps erwartet
 ENV ASPNETCORE_URLS=http://+:8080
 EXPOSE 8080
 
 # Kopieren der veröffentlichten Artefakte
 COPY --from=build /app/publish .
 
-# Startbefehl
-ENTRYPOINT ["dotnet", "AzUrlShortener.dll"]
+# Startbefehl (Der Name der DLL muss mit dem Projektnamen übereinstimmen)
+ENTRYPOINT ["dotnet", "Cloud5mins.ShortenerTools.Api.dll"]
