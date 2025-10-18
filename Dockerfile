@@ -2,16 +2,21 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-# Wir stellen auf Basis der Solution-Datei (.sln) wieder her,
-# da sie im Root-Ordner liegt und alle Abhängigkeiten erfasst.
-COPY ["AzUrlShortener.sln", ""] 
+# Kopiere die Solution-Datei in das Arbeitsverzeichnis
+COPY ["AzUrlShortener.sln", "."]
+
+# Kopiere alle Projektdateien (.csproj) in ihre jeweiligen Unterordner
+# Dies ist notwendig für 'dotnet restore' auf Solution-Ebene
+COPY ["src/**/*.csproj", "src/"] 
+
+# Kopiere alle anderen Dateien
 COPY . .
 
-# Führe den Restore-Befehl aus
+# Stelle alle NuGet-Pakete wieder her, indem wir auf die Solution-Datei verweisen
 RUN dotnet restore "AzUrlShortener.sln"
 
-# Veröffentliche das API-Projekt, das als Hauptanwendung dient.
-# Korrekter Pfad basierend auf Ihrem Screenshot: src/Api/Cloud5mins.ShortenerTools.Api.csproj
+# Veröffentliche das API-Projekt
+# Wir behalten den korrigierten Pfad bei: src/Api/Cloud5mins.ShortenerTools.Api.csproj
 RUN dotnet publish "src/Api/Cloud5mins.ShortenerTools.Api.csproj" -c Release -o /app/publish --no-restore
 
 # STAGE 2: Finale Laufzeit-Umgebung
@@ -23,5 +28,5 @@ EXPOSE 8080
 # Kopieren der veröffentlichten Artefakte
 COPY --from=build /app/publish .
 
-# Startbefehl (Der Name der DLL muss mit dem Projektnamen übereinstimmen)
+# Startbefehl
 ENTRYPOINT ["dotnet", "Cloud5mins.ShortenerTools.Api.dll"]
