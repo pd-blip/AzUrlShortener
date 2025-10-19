@@ -1,41 +1,83 @@
-# --- Der KORREKTE Deployment-Job (ohne Docker, mit AZD) ---
+name: Build and Deploy AzUrlShortener
+
+on:
+  push:
+    branches:
+      - main # Löst aus, wenn du zum main-Branch pushst
+      # Optional: Füge hier weitere Branches hinzu, die deployt werden sollen
+      # - v-next
+  pull_request:
+    branches:
+      - main
+      # - v-next
+
+env:
+  # --- WICHTIG: Ersetze dies durch deinen AZD-Umgebungsnamen! ---
+  AZURE_ENV_NAME: AzUrlShortener # Der Name, den du bei 'azd init' gewählt hast
+
+jobs:
+  # --- Build-Job: Kompiliert die Anwendung ---
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x' # Prüfe ggf. die Projekt-Version
+
+      - name: Clean up previous builds
+        run: dotnet clean src/AzUrlShortener.sln
+
+      - name: Restore dependencies
+        run: dotnet restore src/AzUrlShortener.sln
+
+      - name: Build solution
+        run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
+
+  # --- Deploy-Job: Stellt die Anwendung in Azure bereit ---
   deploy:
     runs-on: ubuntu-latest
-    needs: build
-    environment: Production
+    needs: build # Läuft nur nach erfolgreichem Build
+    environment: Production # Optional: Definiert eine GitHub Environment für Secrets/Freigaben
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    # 1. Azure Login
-    - name: 'Login via Azure CLI'
-      uses: azure/login@v1
-      with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }} # Oder AZURE_RBAC_CREDENTIALS
+      # 1. Azure Login
+      - name: 'Login via Azure CLI'
+        uses: azure/login@v1
+        with:
+          # Stellt sicher, dass das Secret 'AZURE_CREDENTIALS' in GitHub existiert und korrekt ist
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-    # --- KORREKT EINGERÜCKTER DEBUG-SCHRITT ---
-    - name: Check Azure Login Status
-      run: |
-        echo "Checking Azure login status..."
-        az account show
-        echo "Azure login status check complete."
-    # --- ENDE DEBUG-SCHRITT ---
+      # --- DEBUG-SCHRITT: Überprüft den Login-Status ---
+      - name: Check Azure Login Status
+        run: |
+          echo "Checking Azure login status..."
+          az account show
+          echo "Azure login status check complete."
+      # --- ENDE DEBUG-SCHRITT ---
 
-    # 2. Azure Developer CLI (azd) installieren
-    - name: Install Azure Developer CLI
-      run: |
-        curl -fsSL https://aka.ms/install-azd.sh | bash
+      # 2. Azure Developer CLI (azd) installieren
+      - name: Install Azure Developer CLI
+        run: |
+          curl -fsSL https://aka.ms/install-azd.sh | bash
 
-    # 3. Bereitstellung mit AZD durchführen
-    - name: Deploy services using AZD
-      working-directory: ./src # Wichtig: Aus dem src-Ordner ausführen
-      run: azd deploy --no-prompt
-      env:
-        AZURE_ENV_NAME: UrlShortener # <-- Ersetze dies durch deinen Namen
-        AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-        AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      # 3. Bereitstellung mit AZD durchführen
+      - name: Deploy services using AZD
+        # Wichtig: AZD muss aus dem src-Ordner ausgeführt werden!
+        working-directory: ./src
+        run: azd deploy --no-prompt
+        env:
+          # Übergibt den Umgebungsnamen und die IDs an den azd-Befehl
+          AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
-    # 4. Azure Logout (Optional)
-    - name: Azure Logout
-      run: az logout
+      # 4. Azure Logout (Optional, aber gute Praxis)
+      - name: Azure Logout
+        run: az logout
