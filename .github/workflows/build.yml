@@ -16,32 +16,51 @@ jobs: # <-- DIESE ZEILE IST ENTSCHEIDEND
     steps:
       # ... (alle Schritte für den Build-Prozess) ...
 
-  deploy: # Dein zweiter Job, KORREKT EINGERÜCKT unter 'jobs:'
+deploy:
     runs-on: ubuntu-latest
-    needs: build # Abhängigkeit vom build-Job
+    needs: build
     environment: Production
+
     steps:
-      # --- Alle deine Deploy-Schritte kommen hier rein ---
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # 1. Azure Developer CLI (azd) installieren
       - name: Install Azure Developer CLI
-        # ... (Rest deiner Deploy-Schritte) ...
+        run: |
+          curl -fsSL https://aka.ms/install-azd.sh | bash
 
+      # --- NEU: AZD direkt mit separaten Secrets anmelden ---
       - name: Login azd with Service Principal (Direct Secrets)
-        # ...
+        run: |
+          azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
+        # Wichtig: Stelle sicher, dass diese Secrets in GitHub existieren!
 
+      # --- Optional: Login-Status prüfen (nur für azd) ---
       - name: Check AZD Login Status
-        # ...
+        run: azd auth current
 
+      # 2. AZD Environment initialisieren
       - name: Initialize AZD Environment
-        # ...
+        working-directory: ./src
+        run: azd init --no-prompt
+        env:
+           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }} # Nutzt den globalen Env Namen
 
+      # 3. Subscription explizit für AZD setzen
       - name: Set AZD Environment Subscription
-        # ...
+        working-directory: ./src
+        run: azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+        env:
+           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
 
+      # 4. Bereitstellung mit AZD durchführen
       - name: Deploy services using AZD
-        # ...
+        working-directory: ./src
+        run: azd up --no-prompt
+        env:
+          AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
 
+      # 5. AZD Logout (Optional)
       - name: Azure Logout (AZD)
-        # ...
+        run: azd auth logout
