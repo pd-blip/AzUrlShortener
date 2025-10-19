@@ -77,7 +77,7 @@ jobs:
       # 3. Bereitstellung mit AZD durchführen
       - name: Deploy services using AZD
         working-directory: ./src
-        run: azd deploy --no-prompt
+        run: azd up --no-prompt
         env:
           AZURE_ENV_NAME: AzUrlShortener # Dein AZD-Umgebungsname
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
