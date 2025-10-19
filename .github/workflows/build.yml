@@ -58,22 +58,29 @@ jobs:
         env:
           AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # --- NEUER SCHRITT: Subscription explizit für AZD setzen ---
-      - name: Set AZD Environment Subscription
+      # --- NEU: AZD Environment initialisieren ---
+      - name: Initialize AZD Environment
         # Wichtig: AZD muss aus dem src-Ordner ausgeführt werden!
+        working-directory: ./src
+        run: azd init --no-prompt # Initialisiert die Umgebung mit dem Namen aus AZURE_ENV_NAME
+        env:
+           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }} # Stellt sicher, dass der richtige Name verwendet wird
+
+      # 4. Subscription explizit für AZD setzen
+      - name: Set AZD Environment Subscription
         working-directory: ./src
         run: azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         env:
-           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }} # Stellt sicher, dass azd die richtige Umgebung findet
+           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
 
-      # 4. Bereitstellung mit AZD durchführen
+      # 5. Bereitstellung mit AZD durchführen
       - name: Deploy services using AZD
         working-directory: ./src
-        run: azd up --no-prompt # azd kennt jetzt die Subscription
+        run: azd up --no-prompt
         env:
           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
-          # AZURE_SUBSCRIPTION_ID und AZURE_TENANT_ID hier nicht mehr zwingend nötig
+          # AZURE_SUBSCRIPTION_ID und AZURE_TENANT_ID sind jetzt in der .env Datei
 
-      # 5. Azure Logout (Optional)
+      # 6. Azure Logout (Optional)
       - name: Azure Logout
         run: az logout && azd auth logout
