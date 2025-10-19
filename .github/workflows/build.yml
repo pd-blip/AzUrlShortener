@@ -44,7 +44,7 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # 1. Azure Login (wie bisher)
+    # 1. Azure Login wie bisher
     - name: 'Login via Azure CLI'
       uses: azure/login@v1
       with:
