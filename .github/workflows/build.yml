@@ -1,24 +1,43 @@
-name: Build and Deploy AzUrlShortener # Optionaler Name für den Workflow
+name: Build and Deploy AzUrlShortener
 
-on: # Definiert, wann der Workflow starten soll
+on:
   push:
     branches:
       - main
-  # ... (andere Trigger)
+  pull_request:
+    branches:
+      - main
 
-env: # Globale Umgebungsvariablen
-  AZURE_ENV_NAME: AzUrlShortener # Dein AZD-Umgebungsname
-  # ... (andere globale Variablen)
+env:
+  # --- AZD Umgebungsname ---
+  AZURE_ENV_NAME: AzUrlShortener # Dein AZD-Umgebungsname (prüfe diesen!)
 
-jobs: # <-- DIESE ZEILE IST ENTSCHEIDEND
-  build: # Der erste Job (den hattest du vorher schon)
+jobs: # <-- Hier beginnt die Definition der Jobs
+  # --- Build-Job ---
+  build:
     runs-on: ubuntu-latest
     steps:
-      # ... (alle Schritte für den Build-Prozess) ...
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-deploy:
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x' # Prüfe ggf. die Projekt-Version
+
+      - name: Clean up previous builds
+        run: dotnet clean src/AzUrlShortener.sln
+
+      - name: Restore dependencies
+        run: dotnet restore src/AzUrlShortener.sln
+
+      - name: Build solution
+        run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
+
+  # --- Deploy-Job (korrekt unter 'jobs:' eingerückt) ---
+  deploy:
     runs-on: ubuntu-latest
-    needs: build
+    needs: build # Läuft nur nach erfolgreichem Build
     environment: Production
 
     steps:
@@ -30,37 +49,33 @@ deploy:
         run: |
           curl -fsSL https://aka.ms/install-azd.sh | bash
 
-      # --- NEU: AZD direkt mit separaten Secrets anmelden ---
+      # 2. AZD direkt mit separaten Secrets anmelden
       - name: Login azd with Service Principal (Direct Secrets)
         run: |
           azd auth login --client-id ${{ secrets.AZURE_CLIENT_ID }} --client-secret ${{ secrets.AZURE_CLIENT_SECRET }} --tenant-id ${{ secrets.AZURE_TENANT_ID }}
         # Wichtig: Stelle sicher, dass diese Secrets in GitHub existieren!
 
-      # --- Optional: Login-Status prüfen (nur für azd) ---
-      - name: Check AZD Login Status
-        run: azd auth current
-
-      # 2. AZD Environment initialisieren
+      # 3. AZD Environment initialisieren (erstellt .azure Ordner falls nötig)
       - name: Initialize AZD Environment
         working-directory: ./src
         run: azd init --no-prompt
         env:
-           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }} # Nutzt den globalen Env Namen
+           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
 
-      # 3. Subscription explizit für AZD setzen
+      # 4. Subscription explizit für AZD setzen
       - name: Set AZD Environment Subscription
         working-directory: ./src
         run: azd env set AZURE_SUBSCRIPTION_ID ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         env:
            AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
 
-      # 4. Bereitstellung mit AZD durchführen
+      # 5. Bereitstellung mit AZD durchführen
       - name: Deploy services using AZD
         working-directory: ./src
         run: azd up --no-prompt
         env:
           AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
 
-      # 5. AZD Logout (Optional)
+      # 6. AZD Logout (Optional)
       - name: Azure Logout (AZD)
         run: azd auth logout
