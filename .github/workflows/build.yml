@@ -3,50 +3,41 @@ name: Build and Deploy AzUrlShortener
 on:
   push:
     branches:
-      - main
-      - v-next
-  pull_request:
-    branches:
-      - main
-      - v-next
+      - main # Löst aus, wenn du zum main-Branch pushst
 
-# --- Umgebungsvariablen HIER definieren (global für alle Jobs) ---
 env:
-  AZURE_CONTAINER_REGISTRY: 'acr3c4cn3rgwaqwk' # Ihre ACR
-  CONTAINER_APP_NAME: 'admin'                 # Name der zu aktualisierenden Container App (hier: admin)
-  RESOURCE_GROUP: 'rg-AzUrlShortener'         # Ihre Ressourcengruppe
-  IMAGE_NAME: 'tinyblazoradmin'               # Name des Images in ACR (muss dem Namen entsprechen, den Sie beim docker build verwenden!)
+  # --- WICHTIG: Ersetze dies durch deinen AZD-Umgebungsnamen! ---
+  AZURE_ENV_NAME: AzUrlShortener # Der Name, den du bei 'azd init' gewählt hast
 
 jobs:
-  # --- Ihr vorhandener Build-Job ---
   build:
     runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Set up .NET
-      uses: actions/setup-dotnet@v4
-      with:
-        dotnet-version: '9.0.x' # Passen Sie die Version bei Bedarf an
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '9.0.x' # Aktuellere Version verwenden
 
-    - name: Clean up previous builds
-      run: dotnet clean src/AzUrlShortener.sln
+      - name: Clean up previous builds
+        run: dotnet clean src/AzUrlShortener.sln
 
-    - name: Install .NET Aspire workload
-      run: dotnet workload update && dotnet workload install aspire
+      # Aspire workload Installation ist für reinen Build oft nicht nötig
+      # - name: Install .NET Aspire workload
+      #   run: dotnet workload update && dotnet workload install aspire
 
-    - name: Restore dependencies
-      run: dotnet restore src/AzUrlShortener.sln
+      - name: Restore dependencies
+        run: dotnet restore src/AzUrlShortener.sln
 
-    - name: Build solution
-      run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
+      - name: Build solution
+        run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
 
-  # --- Der neue Deployment-Job (korrekt eingerückt) ---
  # --- Der KORREKTE Deployment-Job (ohne Docker, mit AZD) ---
   deploy:
     runs-on: ubuntu-latest
-    needs: build # Stellt sicher, dass dieser Job nur nach einem erfolgreichen Build ausgeführt wird
+    needs: build
     environment: Production
 
     steps:
@@ -57,7 +48,7 @@ jobs:
     - name: 'Login via Azure CLI'
       uses: azure/login@v1
       with:
-        creds: ${{ secrets.AZURE_CREDENTIALS }}
+        creds: ${{ secrets.AZURE_CREDENTIALS }} # Oder AZURE_RBAC_CREDENTIALS
 
     # 2. Azure Developer CLI (azd) installieren
     - name: Install Azure Developer CLI
@@ -65,16 +56,14 @@ jobs:
         curl -fsSL https://aka.ms/install-azd.sh | bash
 
     # 3. Bereitstellung mit AZD durchführen
-    #    WICHTIG: Stellen Sie sicher, dass Ihr AZD-Environment-Name korrekt ist!
-    #    (Der Name, den Sie bei 'azd init' gewählt haben, z.B. 'azurlshortener-prod')
-    #    azd verwendet die Konfiguration aus dem .azure-Ordner.
     - name: Deploy services using AZD
-      run: azd deploy
-      env:
-        AZURE_ENV_NAME: AzUrlShortener # <-- ERSETZEN SIE DIES durch Ihren AZD-Environment-Namen!
+      working-directory: ./src # Wichtig: Aus dem src-Ordner ausführen
+      run: azd deploy --no-prompt
+      env: # <-- DIESER BLOCK IST DER WICHTIGE FÜR AZD DEPLOY
+        # --- HIER gehört der Name rein ---
+        AZURE_ENV_NAME: UrlShortener # <-- Ersetze dies durch deinen Namen
         AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
         AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-        # AZD verwendet die 'creds' vom azure/login Schritt normalerweise automatisch.
 
     # 4. Azure Logout (Optional)
     - name: Azure Logout
