@@ -37,47 +37,52 @@ jobs:
       - name: Build solution
         run: dotnet build src/AzUrlShortener.sln --no-restore --configuration Release
 
-  # --- Deploy-Job: Stellt die Anwendung in Azure bereit ---
+ # --- Der KORREKTE Deployment-Job (ohne Docker, mit AZD) ---
   deploy:
     runs-on: ubuntu-latest
-    needs: build # Läuft nur nach erfolgreichem Build
-    environment: Production # Optional: Definiert eine GitHub Environment für Secrets/Freigaben
+    needs: build
+    environment: Production
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 1. Azure Login
+      # 1. Azure Login (wie bisher, für az Befehle)
       - name: 'Login via Azure CLI'
         uses: azure/login@v1
         with:
-          # Stellt sicher, dass das Secret 'AZURE_CREDENTIALS' in GitHub existiert und korrekt ist
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      # --- DEBUG-SCHRITT: Überprüft den Login-Status ---
+      # --- DEBUG-SCHRITT (Kannst du lassen oder entfernen) ---
       - name: Check Azure Login Status
         run: |
           echo "Checking Azure login status..."
           az account show
           echo "Azure login status check complete."
-      # --- ENDE DEBUG-SCHRITT ---
 
       # 2. Azure Developer CLI (azd) installieren
       - name: Install Azure Developer CLI
         run: |
           curl -fsSL https://aka.ms/install-azd.sh | bash
 
+      # --- HIER IST DER WICHTIGE AZD LOGIN SCHRITT ---
+      - name: Login azd with Service Principal
+        run: |
+          # azd verwendet Umgebungsvariablen für die SP-Anmeldung
+          # Wir lesen die Werte direkt aus dem JSON-Secret
+          azd auth login --client-id ${{ fromJson(secrets.AZURE_CREDENTIALS).clientId }} --client-secret ${{ fromJson(secrets.AZURE_CREDENTIALS).clientSecret }} --tenant-id ${{ fromJson(secrets.AZURE_CREDENTIALS).tenantId }}
+        env:
+          AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }} # Sicherstellen, dass das Secret verfügbar ist
+
       # 3. Bereitstellung mit AZD durchführen
       - name: Deploy services using AZD
-        # Wichtig: AZD muss aus dem src-Ordner ausgeführt werden!
         working-directory: ./src
         run: azd deploy --no-prompt
         env:
-          # Übergibt den Umgebungsnamen und die IDs an den azd-Befehl
-          AZURE_ENV_NAME: ${{ env.AZURE_ENV_NAME }}
+          AZURE_ENV_NAME: AzUrlShortener # Dein AZD-Umgebungsname
           AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
           AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
 
-      # 4. Azure Logout (Optional, aber gute Praxis)
+      # 4. Azure Logout (Optional)
       - name: Azure Logout
-        run: az logout
+        run: az logout && azd auth logout
